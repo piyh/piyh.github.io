@@ -67,15 +67,16 @@
             </div>
         </div>
 
-        <!-- Center Interactions -->
-        <div class="flex-grow flex items-center justify-center">
+        <!-- Center Interactions (Welcome Card) -->
+        <div class="flex-grow flex items-center justify-center relative">
             
             <!-- Welcome / Input Card -->
             <div id="welcome-card" class="glass-panel p-8 rounded-xl max-w-md w-full interactive transform transition-all duration-500">
                 <h2 class="text-3xl font-bold mb-2">Your Carbon Footprint</h2>
                 <p class="text-gray-300 mb-6 text-sm leading-relaxed">
-                    Visualize the physical volume of gasoline your car consumes over time. 
-                    This simulation uses physics to stack the fuel you burn relative to your vehicle size.
+                    Watch your emissions pile up. Literally. 
+                    <br><br>
+                    Enter your MPG below to launch a physics-accurate visualization of every gallon of fuel you burn over a lifetime, stacked directly against your car.
                 </p>
                 
                 <div class="mb-6">
@@ -89,33 +90,33 @@
                 </button>
             </div>
 
-            <!-- End Card -->
-            <div id="end-card" class="glass-panel p-8 rounded-xl max-w-md w-full interactive hidden transform scale-95 opacity-0 transition-all duration-500">
+            <!-- End Card (Positioned to the Right) -->
+            <div id="end-card" class="glass-panel p-8 rounded-xl max-w-xs w-full interactive hidden absolute right-0 top-20 transform translate-x-10 opacity-0 transition-all duration-700">
                 <div class="text-center">
-                    <h2 class="text-3xl font-bold mb-2 text-white">Timeline Complete</h2>
-                    <div class="h-1 w-20 bg-red-500 mx-auto mb-6"></div>
+                    <h2 class="text-2xl font-bold mb-2 text-white">Timeline Complete</h2>
+                    <div class="h-1 w-16 bg-red-500 mx-auto mb-6"></div>
                     
-                    <div class="grid grid-cols-3 gap-4 mb-6 text-center">
-                        <div class="bg-gray-800 p-2 rounded">
-                            <div class="text-xs text-gray-400">Yearly</div>
+                    <div class="space-y-3 mb-6">
+                        <div class="bg-gray-800 p-3 rounded flex justify-between items-center">
+                            <div class="text-xs text-gray-400 text-left">Yearly</div>
                             <div id="res-yearly" class="font-mono font-bold text-red-400">--</div>
                         </div>
-                        <div class="bg-gray-800 p-2 rounded">
-                            <div class="text-xs text-gray-400">Car Life</div>
+                        <div class="bg-gray-800 p-3 rounded flex justify-between items-center">
+                            <div class="text-xs text-gray-400 text-left">Car Life</div>
                             <div id="res-carlife" class="font-mono font-bold text-red-400">--</div>
                         </div>
-                        <div class="bg-gray-800 p-2 rounded">
-                            <div class="text-xs text-gray-400">You</div>
+                        <div class="bg-gray-800 p-3 rounded flex justify-between items-center">
+                            <div class="text-xs text-gray-400 text-left">You</div>
                             <div id="res-human" class="font-mono font-bold text-red-400">--</div>
                         </div>
                     </div>
 
-                    <p class="text-gray-400 text-sm mb-6">
-                        That is the physical volume of liquid you have burned.
+                    <p class="text-gray-300 text-sm mb-6 italic">
+                        "This is the true weight of your commute."
                     </p>
 
-                    <button id="restart-btn" class="bg-white text-black hover:bg-gray-200 font-bold py-2 px-6 rounded transition">
-                        Reset Simulation
+                    <button id="restart-btn" class="w-full bg-white text-black hover:bg-gray-200 font-bold py-2 px-6 rounded transition shadow-lg">
+                        Reset
                     </button>
                 </div>
             </div>
@@ -544,12 +545,12 @@
             document.getElementById('end-card').classList.remove('hidden');
             // Force reflow
             void document.getElementById('end-card').offsetWidth;
-            document.getElementById('end-card').classList.remove('opacity-0', 'scale-95');
+            document.getElementById('end-card').classList.remove('opacity-0', 'translate-x-10');
             
             const y = Math.floor(SETTINGS.avgMilesYear / gameState.mpg);
-            document.getElementById('res-yearly').innerText = y.toLocaleString();
-            document.getElementById('res-carlife').innerText = (y * SETTINGS.carLifeYears).toLocaleString();
-            document.getElementById('res-human').innerText = (y * SETTINGS.humanLifeYears).toLocaleString();
+            document.getElementById('res-yearly').innerText = y.toLocaleString() + " Gal";
+            document.getElementById('res-carlife').innerText = (y * SETTINGS.carLifeYears).toLocaleString() + " Gal";
+            document.getElementById('res-human').innerText = (y * SETTINGS.humanLifeYears).toLocaleString() + " Gal";
         }
 
         // --- Main Loop ---
