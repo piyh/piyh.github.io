@@ -272,9 +272,12 @@
             // Wheels
             const wheelGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.2, 16);
             const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+            
+            // Fixed positions: Moved further out on X axis to avoid clipping with chassis
+            // Chassis width is 2 (extents -1 to 1). Wheel positions +/- 1.15 ensures clearance.
             const positions = [
-                {x: 0.9, z: 1.5}, {x: -0.9, z: 1.5},
-                {x: 0.9, z: -1.5}, {x: -0.9, z: -1.5}
+                {x: 1.15, z: 1.5}, {x: -1.15, z: 1.5},
+                {x: 1.15, z: -1.5}, {x: -1.15, z: -1.5}
             ];
             
             positions.forEach(pos => {
@@ -301,6 +304,47 @@
         }
 
         const car = createCar();
+
+        // --- Wall Construction ---
+        function createWall() {
+            const radius = 30.5; // ~100 feet
+            const height = 6.1;  // ~20 feet
+            
+            // Visual Wall (Transparent Cylinder)
+            const wallGeo = new THREE.CylinderGeometry(radius, radius, height, 64, 1, true);
+            const wallMat = new THREE.MeshStandardMaterial({ 
+                color: 0x444444, 
+                roughness: 0.7, 
+                side: THREE.DoubleSide,
+                transparent: true,
+                opacity: 0.15,
+                wireframe: false
+            });
+            const wallMesh = new THREE.Mesh(wallGeo, wallMat);
+            wallMesh.position.y = height / 2;
+            wallMesh.receiveShadow = true;
+            scene.add(wallMesh);
+
+            // Physics Wall (Approximated by a ring of boxes)
+            // A single concave mesh can be unstable in Cannon.js, so we build a ring of boxes.
+            const numSegments = 48;
+            const segmentWidth = (2 * Math.PI * radius) / numSegments * 1.1; // Slight overlap
+            const segmentShape = new CANNON.Box(new CANNON.Vec3(segmentWidth / 2, height / 2, 1)); // 2m thick wall
+            
+            for (let i = 0; i < numSegments; i++) {
+                const angle = (i / numSegments) * Math.PI * 2;
+                const x = Math.cos(angle) * radius;
+                const z = Math.sin(angle) * radius;
+                
+                const body = new CANNON.Body({ mass: 0, material: groundMat }); // Static
+                body.addShape(segmentShape);
+                body.position.set(x, height / 2, z);
+                body.quaternion.setFromEuler(0, -angle + (Math.PI/2), 0); // Face center
+                world.addBody(body);
+            }
+        }
+
+        createWall();
 
         // --- Asset Generators ---
 
