@@ -1,29 +1,565 @@
-<!--place the text  "CaptionSearch.io will return bigger and better" in the center of the page with nice css and layout in under 20 lines of code.-->
-
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<title>CaptionSearch.io</title>
-<style>
-body {
-    background-color: #000000;
-    color: #ffffff;
-    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-    font-size: 14px;
-    line-height: 1.42857143;
-    margin: 0;
-    padding: 0;
-}
-.center {
-    margin: auto;
-    width: 50%;
-    padding: 10px;
-}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fuel Consumption Visualizer</title>
+    <!-- Tailwind for UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #111; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 0; }
+        .ui-layer { position: absolute; z-index: 10; pointer-events: none; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: space-between; }
+        .interactive { pointer-events: auto; }
+        
+        /* Custom Scrollbar for cards */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #ef4444; border-radius: 3px; }
+
+        .glass-panel {
+            background: rgba(20, 20, 25, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        .progress-container {
+            width: 100%;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            margin-top: 10px;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            background: #ef4444;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+        
+        /* Loader */
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #ef4444; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
 </head>
 <body>
-<div class="center">
-<h1>CaptionSearch.io will return bigger and better</h1>
-</div>
+
+    <div id="canvas-container"></div>
+
+    <!-- UI Layer -->
+    <div class="ui-layer p-6">
+        
+        <!-- Header -->
+        <div class="flex justify-between items-start">
+            <div class="glass-panel p-4 rounded-lg">
+                <h1 class="text-xl font-bold text-white tracking-wider">FUEL<span class="text-red-500">VISUALIZER</span></h1>
+                <div class="text-xs text-gray-400 mt-1">Physics-driven Impact Analysis</div>
+            </div>
+            <div id="stats-panel" class="glass-panel p-4 rounded-lg hidden text-right">
+                <div id="stage-label" class="text-sm font-bold text-red-400 uppercase tracking-widest">STAGE 1</div>
+                <div id="volume-label" class="text-2xl font-bold">0 Gallons</div>
+                <div id="object-count" class="text-xs text-gray-500">0 Objects</div>
+                <div class="progress-container">
+                    <div id="spawn-progress" class="progress-bar"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center Interactions -->
+        <div class="flex-grow flex items-center justify-center">
+            
+            <!-- Welcome / Input Card -->
+            <div id="welcome-card" class="glass-panel p-8 rounded-xl max-w-md w-full interactive transform transition-all duration-500">
+                <h2 class="text-3xl font-bold mb-2">Your Carbon Footprint</h2>
+                <p class="text-gray-300 mb-6 text-sm leading-relaxed">
+                    Visualize the physical volume of gasoline your car consumes over time. 
+                    This simulation uses physics to stack the fuel you burn relative to your vehicle size.
+                </p>
+                
+                <div class="mb-6">
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Enter your Car's MPG</label>
+                    <input type="number" id="mpg-input" value="25" min="5" max="100" 
+                        class="w-full bg-gray-800 border border-gray-600 text-white p-3 rounded focus:outline-none focus:border-red-500 transition-colors text-xl font-mono">
+                </div>
+
+                <button id="start-btn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded shadow-lg transform transition hover:scale-105 flex justify-center items-center gap-2">
+                    <span>INITIALIZE SIMULATION</span>
+                </button>
+            </div>
+
+            <!-- End Card -->
+            <div id="end-card" class="glass-panel p-8 rounded-xl max-w-md w-full interactive hidden transform scale-95 opacity-0 transition-all duration-500">
+                <div class="text-center">
+                    <h2 class="text-3xl font-bold mb-2 text-white">Timeline Complete</h2>
+                    <div class="h-1 w-20 bg-red-500 mx-auto mb-6"></div>
+                    
+                    <div class="grid grid-cols-3 gap-4 mb-6 text-center">
+                        <div class="bg-gray-800 p-2 rounded">
+                            <div class="text-xs text-gray-400">Yearly</div>
+                            <div id="res-yearly" class="font-mono font-bold text-red-400">--</div>
+                        </div>
+                        <div class="bg-gray-800 p-2 rounded">
+                            <div class="text-xs text-gray-400">Car Life</div>
+                            <div id="res-carlife" class="font-mono font-bold text-red-400">--</div>
+                        </div>
+                        <div class="bg-gray-800 p-2 rounded">
+                            <div class="text-xs text-gray-400">You</div>
+                            <div id="res-human" class="font-mono font-bold text-red-400">--</div>
+                        </div>
+                    </div>
+
+                    <p class="text-gray-400 text-sm mb-6">
+                        That is the physical volume of liquid you have burned.
+                    </p>
+
+                    <button id="restart-btn" class="bg-white text-black hover:bg-gray-200 font-bold py-2 px-6 rounded transition">
+                        Reset Simulation
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center text-gray-600 text-xs pb-2">
+            Powered by Three.js & Cannon.js
+        </div>
+    </div>
+
+    <!-- Import Maps (Three + Cannon) -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+                "cannon-es": "https://unpkg.com/cannon-es@0.20.0/dist/cannon-es.js"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+        import * as CANNON from 'cannon-es';
+
+        // --- Configuration & Stats ---
+        const SETTINGS = {
+            avgMilesYear: 13500,
+            carLifeYears: 12,
+            humanLifeYears: 50,
+            stageDuration: 8000, // ms
+            maxObjectsPreStage: 400, // Threshold to switch scale
+            gravity: -9.82,
+            materials: {
+                ground: { friction: 0.6, restitution: 0.2 },
+                object: { friction: 0.3, restitution: 0.1 },
+                car: { friction: 0.5, restitution: 0.1 }
+            }
+        };
+
+        // --- State ---
+        let gameState = {
+            stage: 0, // 0: Ready, 1: Yearly, 2: CarLife, 3: HumanLife, 4: End
+            mpg: 25,
+            totalGallons: 0,
+            spawnQueue: [],
+            physicsBodies: [],
+            meshes: [],
+            active: false,
+            startTime: 0,
+            cameraTargetPos: new THREE.Vector3(15, 10, 15),
+            cameraLookAt: new THREE.Vector3(0, 2, 0)
+        };
+
+        // --- Engine Core ---
+        const canvas = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x111116);
+        scene.fog = new THREE.FogExp2(0x111116, 0.008);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        canvas.appendChild(renderer.domElement);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0x404040, 2); // Soft white light
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        dirLight.position.set(20, 50, 20);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
+        dirLight.shadow.camera.near = 0.5;
+        dirLight.shadow.camera.far = 100;
+        dirLight.shadow.camera.left = -30;
+        dirLight.shadow.camera.right = 30;
+        dirLight.shadow.camera.top = 30;
+        dirLight.shadow.camera.bottom = -30;
+        scene.add(dirLight);
+
+        // Physics World
+        const world = new CANNON.World({
+            gravity: new CANNON.Vec3(0, SETTINGS.gravity, 0),
+        });
+        // Optimization: Sleep bodies that aren't moving
+        world.allowSleep = true;
+        world.broadphase = new CANNON.SAPBroadphase(world);
+
+        // Materials
+        const groundMat = new CANNON.Material();
+        const objectMat = new CANNON.Material();
+        const carMat = new CANNON.Material();
+
+        const objectGroundContact = new CANNON.ContactMaterial(groundMat, objectMat, SETTINGS.materials.ground);
+        const objectObjectContact = new CANNON.ContactMaterial(objectMat, objectMat, SETTINGS.materials.object);
+        const objectCarContact = new CANNON.ContactMaterial(carMat, objectMat, { friction: 0.1, restitution: 0.4 });
+
+        world.addContactMaterial(objectGroundContact);
+        world.addContactMaterial(objectObjectContact);
+        world.addContactMaterial(objectCarContact);
+
+        // Ground
+        const groundGeo = new THREE.PlaneGeometry(200, 200);
+        const groundMeshMat = new THREE.MeshStandardMaterial({ 
+            color: 0x222222, 
+            roughness: 0.8, 
+            metalness: 0.2 
+        });
+        const groundMesh = new THREE.Mesh(groundGeo, groundMeshMat);
+        groundMesh.rotation.x = -Math.PI / 2;
+        groundMesh.receiveShadow = true;
+        scene.add(groundMesh);
+
+        const groundBody = new CANNON.Body({
+            type: CANNON.Body.STATIC,
+            shape: new CANNON.Plane(),
+            material: groundMat
+        });
+        groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+        world.addBody(groundBody);
+
+        // --- Car Construction ---
+        function createCar() {
+            const carGroup = new THREE.Group();
+            
+            // Visuals
+            const chassisMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2, metalness: 0.6 });
+            const glassMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.0, metalness: 0.9 });
+            
+            // Chassis
+            const chassisGeo = new THREE.BoxGeometry(2, 0.6, 4.5);
+            const chassis = new THREE.Mesh(chassisGeo, chassisMat);
+            chassis.position.y = 0.6;
+            chassis.castShadow = true;
+            chassis.receiveShadow = true;
+            carGroup.add(chassis);
+
+            // Cabin
+            const cabinGeo = new THREE.BoxGeometry(1.8, 0.6, 2.5);
+            const cabin = new THREE.Mesh(cabinGeo, glassMat);
+            cabin.position.y = 1.2;
+            cabin.position.z = -0.2;
+            cabin.castShadow = true;
+            carGroup.add(cabin);
+
+            // Wheels
+            const wheelGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.2, 16);
+            const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+            const positions = [
+                {x: 0.9, z: 1.5}, {x: -0.9, z: 1.5},
+                {x: 0.9, z: -1.5}, {x: -0.9, z: -1.5}
+            ];
+            
+            positions.forEach(pos => {
+                const wheel = new THREE.Mesh(wheelGeo, wheelMat);
+                wheel.rotation.z = Math.PI / 2;
+                wheel.position.set(pos.x, 0.35, pos.z);
+                wheel.castShadow = true;
+                carGroup.add(wheel);
+            });
+
+            scene.add(carGroup);
+
+            // Physics Body (Simplified as a Box)
+            const carShape = new CANNON.Box(new CANNON.Vec3(1, 0.75, 2.25));
+            const carBody = new CANNON.Body({
+                mass: 0, // Static
+                material: carMat
+            });
+            carBody.addShape(carShape, new CANNON.Vec3(0, 0.75, 0));
+            carBody.position.set(0, 0, 0);
+            world.addBody(carBody);
+
+            return { mesh: carGroup, body: carBody };
+        }
+
+        const car = createCar();
+
+        // --- Asset Generators ---
+
+        // 1. Standard Gas Can (Approx 1 Gallon - Red Cube)
+        // 3.78 Liters = 0.00378 cubic meters. ~15.5cm side.
+        const canGeo = new THREE.BoxGeometry(0.16, 0.22, 0.16); 
+        const canMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.4 }); // Red
+        const canShape = new CANNON.Box(new CANNON.Vec3(0.08, 0.11, 0.08));
+
+        // 2. Oil Barrel (42 Gallons)
+        // ~0.5m diameter, ~0.9m height
+        const barrelGeo = new THREE.CylinderGeometry(0.28, 0.28, 0.88, 12);
+        const barrelMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.5, metalness: 0.3 }); // Blue
+        const barrelShape = new CANNON.Cylinder(0.28, 0.28, 0.88, 12);
+        
+        // 3. Industrial Tank (1000 Gallons)
+        // Large storage tank
+        const tankGeo = new THREE.SphereGeometry(1.4, 16, 16);
+        const tankMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.2, metalness: 0.8 }); // Dark Steel
+        const tankShape = new CANNON.Sphere(1.4);
+
+
+        // --- Simulation Logic ---
+
+        function createPhysicsObject(type, position) {
+            let mesh, body;
+
+            if (type === 'can') {
+                mesh = new THREE.Mesh(canGeo, canMat);
+                body = new CANNON.Body({ mass: 3, material: objectMat, shape: canShape }); // 3kg approx
+            } else if (type === 'barrel') {
+                mesh = new THREE.Mesh(barrelGeo, barrelMat);
+                body = new CANNON.Body({ mass: 150, material: objectMat, shape: barrelShape }); 
+                // Cannon cylinder orientation fix
+                 const q = new CANNON.Quaternion();
+                q.setFromAxisAngle(new CANNON.Vec3(1,0,0),-Math.PI/2);
+                body.quaternion = q.mult(body.quaternion);
+            } else if (type === 'tank') {
+                mesh = new THREE.Mesh(tankGeo, tankMat);
+                body = new CANNON.Body({ mass: 3000, material: objectMat, shape: tankShape });
+            }
+
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            mesh.position.copy(position);
+            body.position.copy(position);
+            
+            // Random rotation
+            body.quaternion.setFromEuler(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
+
+            scene.add(mesh);
+            world.addBody(body);
+            gameState.meshes.push(mesh);
+            gameState.physicsBodies.push(body);
+        }
+
+        function getSpawnPosition(stageScale) {
+            // Drop from above, randomized slightly to create a pile
+            const h = 6 + (gameState.physicsBodies.length * 0.05); // Height grows as pile grows
+            const r = 0.5 + (Math.random() * (stageScale * 2)); // Radius
+            const angle = Math.random() * Math.PI * 2;
+            
+            return new THREE.Vector3(
+                Math.cos(angle) * r,
+                h,
+                Math.sin(angle) * r
+            );
+        }
+
+        async function runStage(stageIndex) {
+            const ui = {
+                label: document.getElementById('stage-label'),
+                vol: document.getElementById('volume-label'),
+                count: document.getElementById('object-count'),
+                bar: document.getElementById('spawn-progress')
+            };
+
+            let gallons, text, objType, objVol;
+            let mpg = gameState.mpg;
+
+            // Calculations
+            const yearly = SETTINGS.avgMilesYear / mpg;
+            
+            if (stageIndex === 1) {
+                gallons = yearly;
+                text = "YEARLY USAGE";
+                objType = 'can';
+                objVol = 1;
+            } else if (stageIndex === 2) {
+                gallons = yearly * SETTINGS.carLifeYears;
+                text = "CAR LIFETIME";
+                // Logic: If > 500 cans, switch to barrels
+                if (gallons / 1 > 500) {
+                    objType = 'barrel';
+                    objVol = 42;
+                } else {
+                    objType = 'can';
+                    objVol = 1;
+                }
+            } else if (stageIndex === 3) {
+                gallons = yearly * SETTINGS.humanLifeYears;
+                text = "YOUR LIFETIME";
+                 // Logic: Switch to tanks if barrels are too many
+                if (gallons / 42 > 500) {
+                    objType = 'tank';
+                    objVol = 1000;
+                } else {
+                    objType = 'barrel';
+                    objVol = 42;
+                }
+            }
+
+            // Set UI
+            ui.label.innerText = text;
+            ui.label.className = `text-sm font-bold uppercase tracking-widest ${stageIndex===1?'text-red-400':stageIndex===2?'text-blue-400':'text-gray-400'}`;
+            ui.vol.innerText = Math.floor(gallons).toLocaleString() + " Gal";
+            
+            const targetCount = Math.floor(gallons / objVol);
+            
+            // Adjust Camera Target
+            if (stageIndex === 1) {
+                 gameState.cameraTargetPos.set(8, 5, 8);
+            } else if (stageIndex === 2) {
+                 gameState.cameraTargetPos.set(20, 15, 20);
+            } else if (stageIndex === 3) {
+                 gameState.cameraTargetPos.set(50, 40, 50);
+            }
+
+            // Spawning Loop
+            const spawnRate = SETTINGS.stageDuration / targetCount; // Time per object
+            
+            // Batching: If spawnRate is too fast (< 16ms), spawn multiple per frame
+            let batchSize = 1;
+            let interval = spawnRate;
+            
+            if (spawnRate < 16) {
+                batchSize = Math.ceil(16 / spawnRate);
+                interval = 16;
+            }
+
+            let spawned = 0;
+
+            return new Promise((resolve) => {
+                const timer = setInterval(() => {
+                    if (!gameState.active) { clearInterval(timer); return; }
+
+                    for(let i=0; i<batchSize; i++) {
+                        if (spawned >= targetCount) break;
+                        createPhysicsObject(objType, getSpawnPosition(stageIndex));
+                        spawned++;
+                    }
+
+                    // UI Update
+                    ui.count.innerText = (gameState.physicsBodies.length).toLocaleString() + " Objects";
+                    ui.bar.style.width = ((spawned / targetCount) * 100) + "%";
+
+                    if (spawned >= targetCount) {
+                        clearInterval(timer);
+                        resolve();
+                    }
+                }, interval);
+            });
+        }
+
+        async function startSimulation() {
+            const input = document.getElementById('mpg-input');
+            gameState.mpg = parseFloat(input.value) || 25;
+            
+            // UI Transition
+            document.getElementById('welcome-card').classList.add('opacity-0', 'scale-95', 'pointer-events-none');
+            setTimeout(() => { document.getElementById('welcome-card').classList.add('hidden'); }, 500);
+            document.getElementById('stats-panel').classList.remove('hidden');
+            
+            gameState.active = true;
+            gameState.stage = 1;
+
+            // Stage 1
+            await runStage(1);
+            // Wait a moment
+            await new Promise(r => setTimeout(r, 1000));
+            
+            // Stage 2
+            gameState.stage = 2;
+            await runStage(2);
+            await new Promise(r => setTimeout(r, 1000));
+
+            // Stage 3
+            gameState.stage = 3;
+            await runStage(3);
+            await new Promise(r => setTimeout(r, 2000));
+
+            endSimulation();
+        }
+
+        function endSimulation() {
+            gameState.stage = 4;
+            document.getElementById('end-card').classList.remove('hidden');
+            // Force reflow
+            void document.getElementById('end-card').offsetWidth;
+            document.getElementById('end-card').classList.remove('opacity-0', 'scale-95');
+            
+            const y = Math.floor(SETTINGS.avgMilesYear / gameState.mpg);
+            document.getElementById('res-yearly').innerText = y.toLocaleString();
+            document.getElementById('res-carlife').innerText = (y * SETTINGS.carLifeYears).toLocaleString();
+            document.getElementById('res-human').innerText = (y * SETTINGS.humanLifeYears).toLocaleString();
+        }
+
+        // --- Main Loop ---
+
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const delta = Math.min(clock.getDelta(), 0.1); // Cap delta to prevent physics explosions
+
+            // Physics Step
+            if (gameState.active || gameState.physicsBodies.length > 0) {
+                world.step(1 / 60, delta, 3);
+            }
+
+            // Sync Mesh with Physics
+            for (let i = 0; i < gameState.physicsBodies.length; i++) {
+                gameState.meshes[i].position.copy(gameState.physicsBodies[i].position);
+                gameState.meshes[i].quaternion.copy(gameState.physicsBodies[i].quaternion);
+                
+                // Height cull (performance)
+                if (gameState.physicsBodies[i].position.y < -10) {
+                    // Reset or sleep? For now, just let them fall
+                }
+            }
+
+            // Camera Lerp
+            camera.position.lerp(gameState.cameraTargetPos, 0.02);
+            camera.lookAt(gameState.cameraLookAt);
+
+            renderer.render(scene, camera);
+        }
+
+        // Initial Camera
+        camera.position.set(8, 4, 8);
+        camera.lookAt(0, 1, 0);
+
+        animate();
+
+        // --- Resize Handler ---
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // --- Event Listeners ---
+        document.getElementById('start-btn').addEventListener('click', startSimulation);
+        
+        document.getElementById('restart-btn').addEventListener('click', () => {
+            location.reload(); // Easiest way to clear physics world completely
+        });
+
+    </script>
 </body>
 </html>
